@@ -17,19 +17,19 @@
 
 static clock_t start;
 
-void _print_IPv4_time_and_mac_addr (struct ether_header *ep) {
+void _print_IPv4_time_and_mac_addr (struct ether_header *ehdr) {
     double recv_time = (double)(clock()-start)/CLOCKS_PER_SEC;
     printf ("%f: ", recv_time);
     printf ("[");
     for (int i=0; i<6; i++) {
-        printf ("%02X", ep->ether_shost[i]);
+        printf ("%02X", ehdr->ether_shost[i]);
         if (i == 5)
             break;
         putchar(':');
     }
     printf ("->");
     for (int i=0; i<6; i++) {
-        printf ("%02X", ep->ether_dhost[i]);
+        printf ("%02X", ehdr->ether_dhost[i]);
         if (i == 5)
             break;
         putchar(':');
@@ -84,20 +84,19 @@ void print_IPv4 (int PROTO_TYPE, struct ip* ip_hdr, void* proto_hdr) {
     }
 }
 
-/* Callback function invoked by libpcap for every incoming packet */
 void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt_data)
 {
-    struct ether_header *ep;
+    struct ether_header *ehdr;
     unsigned short proto_type;
 
-    // 이더넷 헤더를 가져온다.
-    ep = (struct ether_header *)pkt_data;
+    // 이더넷 헤더
+    ehdr = (struct ether_header *)pkt_data;
 
-    // IP 헤더를 가져오기 위해서 이더넷 헤더 크기만큼 offset 한다.
+    // IP 헤더 (이더넷 헤더 크기만큼 offset)
     pkt_data += sizeof(struct ether_header);
 
-    // 프로토콜 타입을 알아낸다.
-    proto_type = ntohs(ep->ether_type);
+    // 프로토콜 타입
+    proto_type = ntohs(ehdr->ether_type);
 
     if (proto_type == ETHERTYPE_IP) { // IPv4
         struct ip *ip_hdr = (struct ip *)pkt_data;
@@ -137,31 +136,26 @@ int main (int argc, char* argv[]) {
     
     if (inum < 1 || inum > i) {
         printf ("\nInterface number out of range.\n");
-        /* Free the device list */
         pcap_freealldevs (alldevs);
         return -1;
     }
     
     for (d=alldevs, i=0; i< inum-1; d=d->next, i++); // jump
     
-    if ( (pcd= pcap_open_live(d->name, BUFSIZ, 1, 1000, errbuf) ) == NULL)
-    {
-        fprintf(stderr,"\nUnable to open the adapter. %s is not supported\n", d->name);
-        /* Free the device list */
+    pcd = pcap_open_live(d->name, BUFSIZ, 1, 1000, errbuf);
+    if (pcd == NULL) {
+        fprintf(stderr,"\nunable to open the adapter. %s is not supported\n", d->name);
         pcap_freealldevs(alldevs);
         return -1;
     }
-    
-    printf("\nselected device %s is available\n", d->description);
-    
-    /* At this point, we don't need any more the device list. Free it */
-    pcap_freealldevs(alldevs);
-    
-    start = clock();
+    else {
+        printf("\nselected device %s is available\n", d->description);
+    }
 
-    /* start the capture */
+    pcap_freealldevs(alldevs);
+    start = clock();
     pcap_loop(pcd, -1, callback, NULL);
-    
+
     printf ("exit\n");
     return 0;
 }
