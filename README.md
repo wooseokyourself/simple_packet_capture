@@ -9,7 +9,7 @@ This https://github.com/wooseokyourself/simple_packet_capture repo contains code
 * macOS 10.15.5
 * gcc/g++
 * GNU Make
-* pcap
+* libpcap-dev
 
    
 # Install
