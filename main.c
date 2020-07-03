@@ -81,6 +81,7 @@ int main (int argc, char* argv[]) {
     /* start the capture */
     pcap_loop(pcd, -1, callback, NULL);
     
+    printf ("exit\n");
     return 0;
 }
 
