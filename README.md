@@ -1,16 +1,26 @@
-# Application Protocol
-    std::vector<unsigned char>
-* Encoded form of cv::Mat. There is a process of encoding cv::Mat in this program.
+# Introduction
+This directory contains simple packet capture program, and is freely available.
+
+# Description
+This https://github.com/wooseokyourself/simple_packet_capture repo contains code for capturing TCP, UDP, or ICMP in arriving packets at any network interfaces by using pcap library. The code works on UNIX-like OS.
+
+# Test Environment and Requirements
+* Ubuntu 16.04.6 LTS
+* macOS 10.15.5
+* gcc/g++
+* GNU Make
+* pcap
+
    
 # Install
     make all
    
 # Run
     make run
-* 'make run' will ask you the value of $(IP) and $(PORT). 
-* Next, this program will ask you the ID. This number should be in order from 1.
    
 # Others
 
 ### Remove *.out
     make clean
+    
+# Example
