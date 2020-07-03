@@ -15,8 +15,111 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 
-/* prototype of the packet handler */
-void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt_data);
+void _print_IPv4_mac_addr (struct ether_header *ep) {
+    printf ("[");
+    for (int i=0; i<6; i++) {
+        printf ("%02X", ep->ether_shost[i]);
+        if (i == 5)
+            break;
+        putchar(':');
+    }
+    printf ("->");
+    for (int i=0; i<6; i++) {
+        printf ("%02X", ep->ether_dhost[i]);
+        if (i == 5)
+            break;
+        putchar(':');
+    }
+    printf ("]");
+}
+
+void print_IPv4_src_to_dst (int PROTO_TYPE, struct ip* ip_hdr, void* proto_hdr) {
+    if (PROTO_TYPE == IPPROTO_TCP) {
+        printf ("%c[1;31mTCP ", 27);
+        struct tcphdr *tcp_hdr = (struct tcphdr *)proto_hdr;
+        _print_IPv4_mac_addr (ip_hdr);
+        printf ("(%s:%d -> %s:%d) [seq:%u][ack:%u]", 
+            inet_ntoa(ip_hdr->ip_src),
+            ntohs(tcp_hdr->th_sport),  
+            inet_ntoa(ip_hdr->ip_dst), 
+            ntohs(tcp_hdr->th_dport), 
+            tcp_hdr->th_seq, 
+            tcp_hdr->th_ack
+        );
+        printf ("%c[0m\n", 27);
+    }
+    else if (PROTO_TYPE == IPPROTO_UDP) {
+        printf ("%c[1;36mUDP ", 27);
+        struct udphdr *udp_hdr = (struct udphdr *)proto_hdr;
+        _print_IPv4_mac_addr (ip_hdr);
+        printf ("(%s:%d -> %s:%d)", 
+            inet_ntoa(ip_hdr->ip_src),
+            ntohs(udp_hdr->uh_sport),  
+            inet_ntoa(ip_hdr->ip_dst), 
+            ntohs(udp_hdr->uh_dport)
+        );
+        printf ("%c[0m\n", 27);
+    }
+    else if (PROTO_TYPE == IPPROTO_ICMP) {
+        printf ("%c[1;33mICMP ", 27);
+        struct icmp *icmp_hdr = (struct icmp *)proto_hdr;
+        _print_IPv4_mac_addr (ip_hdr);
+        printf (" ICMP (%s -> %s) [type:%d][code:%d]", 
+            inet_ntoa(ip_hdr->ip_src),  
+            inet_ntoa(ip_hdr->ip_dst), 
+            icmp_hdr->icmp_type, 
+            icmp_hdr->icmp_code
+        );
+        printf ("%c[0m\n", 27);
+    }
+}
+
+/* Callback function invoked by libpcap for every incoming packet */
+void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt_data)
+{
+    struct ether_header *ep;
+    unsigned short proto_type;
+
+    // 이더넷 헤더를 가져온다.
+    ep = (struct ether_header *)pkt_data;
+
+    // IP 헤더를 가져오기 위해서 이더넷 헤더 크기만큼 offset 한다.
+    pkt_data += sizeof(struct ether_header);
+
+    // 프로토콜 타입을 알아낸다.
+    proto_type = ntohs(ep->ether_type);
+
+//////// print time stamp
+
+    struct tm ltime;
+    char timestr[16];
+    time_t local_tv_sec;
+
+    // convert the timestamp to readable format
+    local_tv_sec = header->ts.tv_sec;
+    localtime(&local_tv_sec);
+    strftime( timestr, sizeof timestr, "%H:%M:%S", &ltime);
+    
+    printf("%s,%.6d len:%d", timestr, header->ts.tv_usec, header->len);
+    if (header->len > 999)
+        printf ("\t");
+    else
+        printf ("\t\t");
+
+////////
+
+    if (proto_type == ETHERTYPE_IP) { // IPv4
+        struct ip *ip_hdr = (struct ip *)pkt_data;
+        print_IPv4_src_to_dst (ip_hdr->ip_p, ip_hdr, (pkt_data + ip_hdr->ip_hl * 4));
+    }
+    else if (proto_type == ETHERTYPE_IPV6) { // IPv6
+        printf ("%c[1;35mIPv6%c[0m\n", 27, 27);
+    }
+    else {
+        printf ("NOTHING\n");
+    }
+}
+
 
 int main (int argc, char* argv[]) {
     pcap_if_t *alldevs;
@@ -79,90 +182,8 @@ int main (int argc, char* argv[]) {
     pcap_freealldevs(alldevs);
     
     /* start the capture */
-    pcap_loop(pcd, -1, callback, NULL);
+    pcap_loop(pcd, 0, callback, NULL);
     
     printf ("exit\n");
     return 0;
-}
-
-
-/* Callback function invoked by libpcap for every incoming packet */
-void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt_data)
-{
-    printf ("CALLBACK ");
-    struct ether_header *ep;
-    unsigned short proto_type;
-
-    // 이더넷 헤더를 가져온다.
-    ep = (struct ether_header *)pkt_data;
-
-    // IP 헤더를 가져오기 위해서 이더넷 헤더 크기만큼 offset 한다.
-    pkt_data += sizeof(struct ether_header);
-
-    // 프로토콜 타입을 알아낸다.
-    proto_type = ntohs(ep->ether_type);
-
-    // IPv4
-    if (proto_type == ETHERTYPE_IP) {
-        printf ("IPv4 ");
-        struct ip *ip_hdr = (struct ip *)pkt_data;
-        
-        if (ip_hdr->ip_p == IPPROTO_TCP) {
-            printf ("THISIS TCP");
-            struct tcphdr *tcp_hdr = (struct tcp *)(pkt_data + ip_hdr->ip_hl * 4);
-            printf (" TCP [%s->%s](%s:%d -> %s:%d)\n", 
-                inet_ntoa(ip_hdr->ip_src),
-                ntohs(tcp_hdr->th_sport),  
-                inet_ntoa(ip_hdr->ip_dst), 
-                ntohs(tcp_hdr->th_dport)
-            );
-        }
-        else if (ip_hdr->ip_p == IPPROTO_UDP) {
-            printf ("THISIS UDP");
-            struct udphdr *udp_hdr = (struct udp *)(pkt_data + ip_hdr->ip_hl * 4);
-            printf (" UDP (%s:%d -> %s:%d)\n", 
-                inet_ntoa(ip_hdr->ip_src),
-                ntohs(udp_hdr->uh_sport),  
-                inet_ntoa(ip_hdr->ip_dst), 
-                ntohs(udp_hdr->uh_dport)
-            );
-        }
-        else if (ip_hdr->ip_p == IPPROTO_ICMP) {
-            printf ("THISIS ICMP");
-            struct icmp *icmp_hdr = (struct icmp *)(pkt_data + ip_hdr->ip_hl * 4);
-            printf (" ICMP\n");
-            /*
-            printf (" ICMP (%s:%d -> %s:%d)\n", 
-                inet_ntoa(ip_hdr->ip_src),  
-                inet_ntoa(ip_hdr->ip_dst)
-            );*/
-            /*
-            printf (" ICMP (%s:%d -> %s:%d)[type:%c][code:%c]\n", 
-                inet_ntoa(ip_hdr->ip_src),  
-                inet_ntoa(ip_hdr->ip_dst), 
-                icmp_hdr->icmp_type, 
-                icmp_hdr->icmp_code
-            );*/
-        }
-    }
-    else if (proto_type == ETHERTYPE_IPV6) { 
-        printf (" IPv6\n");
-    }
-    /*
-    struct tm ltime;
-    char timestr[16];
-    time_t local_tv_sec;
-
-    
-    // unused variables
-    (void)(param);
-    (void)(pkt_data);
-
-    // convert the timestamp to readable format
-    local_tv_sec = header->ts.tv_sec;
-    localtime(&local_tv_sec);
-    strftime( timestr, sizeof timestr, "%H:%M:%S", &ltime);
-    
-    printf("%s,%.6d len:%d\n", timestr, header->ts.tv_usec, header->len);
-    */   
 }
