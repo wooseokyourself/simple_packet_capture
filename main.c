@@ -79,7 +79,7 @@ int main (int argc, char* argv[]) {
     pcap_freealldevs(alldevs);
     
     /* start the capture */
-    pcap_loop(pcd, 0, callback, NULL);
+    pcap_loop(pcd, -1, callback, NULL;
     
     return 0;
 }
@@ -88,6 +88,7 @@ int main (int argc, char* argv[]) {
 /* Callback function invoked by libpcap for every incoming packet */
 void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt_data)
 {
+    printf ("CALLBACK ");
     struct ether_header *ep;
     unsigned short proto_type;
 
@@ -102,6 +103,7 @@ void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt
 
     // IPv4
     if (proto_type == ETHERTYPE_IP) {
+        printf ("IPv4 ");
         struct ip *ip_hdr = (struct ip *)pkt_data;
         
         if (ip_hdr->ip_p == IPPROTO_TCP) {
