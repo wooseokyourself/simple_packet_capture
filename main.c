@@ -17,7 +17,9 @@
 
 static clock_t start;
 
-void _print_IPv4_mac_addr (struct ether_header *ep) {
+void _print_IPv4_time_and_mac_addr (struct ether_header *ep) {
+    double recv_time = (double)(clock()-start)/CLOCKS_PER_SEC;
+    printf ("%f: ", recv_time);
     printf ("[");
     for (int i=0; i<6; i++) {
         printf ("%02X", ep->ether_shost[i]);
@@ -35,43 +37,49 @@ void _print_IPv4_mac_addr (struct ether_header *ep) {
     printf ("]");
 }
 
-void print_IPv4_src_to_dst (int PROTO_TYPE, struct ip* ip_hdr, void* proto_hdr) {
+void print_IPv4 (int PROTO_TYPE, struct ip* ip_hdr, void* proto_hdr) {
     if (PROTO_TYPE == IPPROTO_TCP) {
-        printf ("%c[1;31mTCP ", 27);
+        printf ("%c[1;31m", 27);
+
         struct tcphdr *tcp_hdr = (struct tcphdr *)proto_hdr;
-        _print_IPv4_mac_addr (ip_hdr);
-        printf ("(%s:%d -> %s:%d) [seq:%u][ack:%u]", 
+        _print_IPv4_time_and_mac_addr (ip_hdr);
+        printf ("(%15s->%15s) TCP\t[port:%5d->%5d][seq:%10u][ack:%10u]", 
             inet_ntoa(ip_hdr->ip_src),
-            ntohs(tcp_hdr->th_sport),  
             inet_ntoa(ip_hdr->ip_dst), 
+            ntohs(tcp_hdr->th_sport),  
             ntohs(tcp_hdr->th_dport), 
             tcp_hdr->th_seq, 
             tcp_hdr->th_ack
         );
+
         printf ("%c[0m\n", 27);
     }
     else if (PROTO_TYPE == IPPROTO_UDP) {
-        printf ("%c[1;36mUDP ", 27);
+        printf ("%c[1;36m", 27);
+
         struct udphdr *udp_hdr = (struct udphdr *)proto_hdr;
-        _print_IPv4_mac_addr (ip_hdr);
-        printf ("(%s:%d -> %s:%d)", 
+        _print_IPv4_time_and_mac_addr (ip_hdr);
+        printf ("(%15s->%15s) UDP\t[port:%5d->%5d]", 
             inet_ntoa(ip_hdr->ip_src),
+            inet_ntoa(ip_hdr->ip_dst),
             ntohs(udp_hdr->uh_sport),  
-            inet_ntoa(ip_hdr->ip_dst), 
             ntohs(udp_hdr->uh_dport)
         );
+
         printf ("%c[0m\n", 27);
     }
     else if (PROTO_TYPE == IPPROTO_ICMP) {
-        printf ("%c[1;33mICMP ", 27);
+        printf ("%c[1;33m", 27);
+
         struct icmp *icmp_hdr = (struct icmp *)proto_hdr;
-        _print_IPv4_mac_addr (ip_hdr);
-        printf (" ICMP (%s -> %s) [type:%d][code:%d]", 
+        _print_IPv4_time_and_mac_addr (ip_hdr);
+        printf ("(%15s->%15s) ICMP\t[type:%2d][code:%2d]", 
             inet_ntoa(ip_hdr->ip_src),  
             inet_ntoa(ip_hdr->ip_dst), 
             icmp_hdr->icmp_type, 
             icmp_hdr->icmp_code
         );
+
         printf ("%c[0m\n", 27);
     }
 }
@@ -79,8 +87,6 @@ void print_IPv4_src_to_dst (int PROTO_TYPE, struct ip* ip_hdr, void* proto_hdr) 
 /* Callback function invoked by libpcap for every incoming packet */
 void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt_data)
 {
-    double recv_time = (double)(clock()-start)/CLOCKS_PER_SEC;
-
     struct ether_header *ep;
     unsigned short proto_type;
 
@@ -93,38 +99,9 @@ void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt
     // 프로토콜 타입을 알아낸다.
     proto_type = ntohs(ep->ether_type);
 
-//////// print time stamp
-    
-    /*
-    struct tm ltime;
-    char timestr[16];
-    time_t local_tv_sec;
-
-    // convert the timestamp to readable format
-    local_tv_sec = header->ts.tv_sec;
-    localtime(&local_tv_sec);
-    strftime( timestr, sizeof timestr, "%H:%M:%S", &ltime);
-    
-    printf ("%s,%.6d len:%d", timestr, header->ts.tv_usec, header->len);
-    if (header->len > 999)
-        printf ("\t");
-    else
-        printf ("\t\t");
-    */
-
-////////
-
-    printf ("%f: ", recv_time);
-
     if (proto_type == ETHERTYPE_IP) { // IPv4
         struct ip *ip_hdr = (struct ip *)pkt_data;
-        print_IPv4_src_to_dst (ip_hdr->ip_p, ip_hdr, (pkt_data + ip_hdr->ip_hl * 4));
-    }
-    else if (proto_type == ETHERTYPE_IPV6) { // IPv6
-        printf ("%c[1;35mIPv6%c[0m\n", 27, 27);
-    }
-    else {
-        printf ("NOTHING\n");
+        print_IPv4 (ip_hdr->ip_p, ip_hdr, (pkt_data + ip_hdr->ip_hl * 4));
     }
 }
 
@@ -139,31 +116,31 @@ int main (int argc, char* argv[]) {
     
     /* Retrieve the device list on the local machine */
     if (pcap_findalldevs(&alldevs, errbuf) == -1) {
-        fprintf(stderr,"Error in pcap_findalldevs: %s\n", errbuf);
+        fprintf (stderr, "Error in pcap_findalldevs: %s\n", errbuf);
         exit(1);
     }
     
     /* Print the list */
     for (d=alldevs; d; d=d->next) {
-        printf("%d. %s", ++i, d->name);
+        printf ("%d. %s", ++i, d->name);
         if (d->description != NULL)
-            printf(" (%s)\n", d->description);
+            printf (" (%s)\n", d->description);
         else
-            printf(" (No description available)\n");
+            printf (" (No description available)\n");
     }
     
     if (i==0) {
-        printf("\nNo interfaces found!\n");
+        printf ("\nNo interfaces found!\n");
         return -1;
     }
     
-    printf("Enter the interface number (1-%d):",i);
-    scanf("%d", &inum);
+    printf ("Enter the interface number (1-%d):",i);
+    scanf ("%d", &inum);
     
     if (inum < 1 || inum > i) {
-        printf("\nInterface number out of range.\n");
+        printf ("\nInterface number out of range.\n");
         /* Free the device list */
-        pcap_freealldevs(alldevs);
+        pcap_freealldevs (alldevs);
         return -1;
     }
     
