@@ -79,7 +79,7 @@ int main (int argc, char* argv[]) {
     pcap_freealldevs(alldevs);
     
     /* start the capture */
-    pcap_loop(pcd, -1, callback, NULL;
+    pcap_loop(pcd, -1, callback, NULL);
     
     return 0;
 }
