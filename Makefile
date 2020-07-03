@@ -1,8 +1,10 @@
 all:
-	gcc main.c -lpcap -o a.out
+	mkdir bin
+	gcc src/main.c -lpcap -w -o bin/main.out
 
 clean:
-	rm -f a.out
+	rm -f bin/main.out
+	rm -d bin
 
 run:
-	./a.out
+	./bin/main.out
