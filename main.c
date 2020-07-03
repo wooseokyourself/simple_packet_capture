@@ -15,6 +15,8 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 
+static clock_t start;
+
 void _print_IPv4_mac_addr (struct ether_header *ep) {
     printf ("[");
     for (int i=0; i<6; i++) {
@@ -77,6 +79,8 @@ void print_IPv4_src_to_dst (int PROTO_TYPE, struct ip* ip_hdr, void* proto_hdr) 
 /* Callback function invoked by libpcap for every incoming packet */
 void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt_data)
 {
+    double recv_time = (double)(clock()-start)/CLOCKS_PER_SEC;
+
     struct ether_header *ep;
     unsigned short proto_type;
 
@@ -90,7 +94,8 @@ void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt
     proto_type = ntohs(ep->ether_type);
 
 //////// print time stamp
-
+    
+    /*
     struct tm ltime;
     char timestr[16];
     time_t local_tv_sec;
@@ -100,13 +105,16 @@ void callback(u_char *param, const struct pcap_pkthdr *header, const u_char *pkt
     localtime(&local_tv_sec);
     strftime( timestr, sizeof timestr, "%H:%M:%S", &ltime);
     
-    printf("%s,%.6d len:%d", timestr, header->ts.tv_usec, header->len);
+    printf ("%s,%.6d len:%d", timestr, header->ts.tv_usec, header->len);
     if (header->len > 999)
         printf ("\t");
     else
         printf ("\t\t");
+    */
 
 ////////
+
+    printf ("%f: ", recv_time);
 
     if (proto_type == ETHERTYPE_IP) { // IPv4
         struct ip *ip_hdr = (struct ip *)pkt_data;
@@ -181,8 +189,10 @@ int main (int argc, char* argv[]) {
     /* At this point, we don't need any more the device list. Free it */
     pcap_freealldevs(alldevs);
     
+    start = clock();
+
     /* start the capture */
-    pcap_loop(pcd, 0, callback, NULL);
+    pcap_loop(pcd, -1, callback, NULL);
     
     printf ("exit\n");
     return 0;
