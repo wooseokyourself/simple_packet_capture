@@ -114,13 +114,11 @@ int main (int argc, char* argv[]) {
     pcap_t *pcd;
     char errbuf[PCAP_ERRBUF_SIZE];
     
-    /* Retrieve the device list on the local machine */
     if (pcap_findalldevs(&alldevs, errbuf) == -1) {
         fprintf (stderr, "Error in pcap_findalldevs: %s\n", errbuf);
         exit(1);
     }
     
-    /* Print the list */
     for (d=alldevs; d; d=d->next) {
         printf ("%d. %s", ++i, d->name);
         if (d->description != NULL)
@@ -144,16 +142,9 @@ int main (int argc, char* argv[]) {
         return -1;
     }
     
-    /* Jump to the selected adapter */
-    for (d=alldevs, i=0; i< inum-1 ;d=d->next, i++);
+    for (d=alldevs, i=0; i< inum-1; d=d->next, i++); // jump
     
-    /* Open the device */
-    if ( (pcd= pcap_open_live(d->name,          // name of the device
-                              BUFSIZ,            // portion of the packet to capture
-                              1,    // promiscuous mode
-                              1000,             // read timeout
-                              errbuf            // error buffer
-                              ) ) == NULL)
+    if ( (pcd= pcap_open_live(d->name, BUFSIZ, 1, 1000, errbuf) ) == NULL)
     {
         fprintf(stderr,"\nUnable to open the adapter. %s is not supported\n", d->name);
         /* Free the device list */
